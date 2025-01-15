@@ -12,6 +12,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+
+      - name: Create .env file
+        run: |
+          echo "AF_BASE_URL=${{ secrets.AF_BASE_URL }}" >> .env
+          echo "AF_GOTRUE_URL=${{ secrets.AF_GOTRUE_URL }}" >> .env
+          echo "AF_WS_URL=${{ secrets.AF_WS_URL }}" >> .env
         
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
