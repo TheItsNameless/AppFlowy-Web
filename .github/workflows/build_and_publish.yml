@@ -27,11 +27,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Make image
-        run: make image
-
-      - name: Tag Docker image
-        run: docker tag appflowy-web-app:latest ghcr.io/theitsnameless/appflowy-web-app:latest
+      - name: Prepare building the image
+        run: |
+          cp .env deploy/
+          rm -rf deploy/dist
+          cp -r dist deploy/
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v1
@@ -40,5 +40,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push Docker image
-        run: docker push ghcr.io/theitsnameless/appflowy-web-app:latest
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ghcr.io/theitsnameless/appflowy-web-app:latest
