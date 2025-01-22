@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Build appflowy-web
+        run: pnpm run build
+
       - name: Prepare building the image
         run: |
           cp .env deploy/
