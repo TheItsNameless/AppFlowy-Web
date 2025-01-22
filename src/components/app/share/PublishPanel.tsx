@@ -10,8 +10,9 @@ import { useTranslation } from 'react-i18next';
 import { ReactComponent as PublishIcon } from '@/assets/publish.svg';
 import { ReactComponent as CheckboxCheckSvg } from '@/assets/check_filled.svg';
 import { ReactComponent as CheckboxUncheckSvg } from '@/assets/uncheck.svg';
+import { Switch } from '@/components/_shared/switch';
 
-function PublishPanel ({ viewId, opened, onClose }: { viewId: string; onClose: () => void; opened: boolean }) {
+function PublishPanel({ viewId, opened, onClose }: { viewId: string; onClose: () => void; opened: boolean }) {
   const { t } = useTranslation();
   const {
     publish,
@@ -25,19 +26,29 @@ function PublishPanel ({ viewId, opened, onClose }: { viewId: string; onClose: (
     loading,
     isOwner,
     isPublisher,
+    updatePublishConfig,
   } = useLoadPublishInfo(viewId);
   const [unpublishLoading, setUnpublishLoading] = React.useState<boolean>(false);
   const [publishLoading, setPublishLoading] = React.useState<boolean>(false);
   const [visibleViewId, setVisibleViewId] = React.useState<string[] | undefined>(undefined);
+  const [commentEnabled, setCommentEnabled] = React.useState<boolean | undefined>(undefined);
+  const [duplicateEnabled, setDuplicateEnabled] = React.useState<boolean | undefined>(undefined);
 
   useEffect(() => {
-    if (opened) {
+    if(opened) {
       void loadPublishInfo();
     }
   }, [loadPublishInfo, opened]);
 
-  const handlePublish = useCallback(async (publishName?: string) => {
-    if (!publish || !view) return;
+  useEffect(() => {
+    if(opened && publishInfo) {
+      setCommentEnabled(publishInfo.commentEnabled);
+      setDuplicateEnabled(publishInfo.duplicateEnabled);
+    }
+  }, [opened, publishInfo]);
+
+  const handlePublish = useCallback(async(publishName?: string) => {
+    if(!publish || !view) return;
 
     setPublishLoading(true);
     const newPublishName = publishName || publishInfo?.publishName || undefined;
@@ -47,16 +58,16 @@ function PublishPanel ({ viewId, opened, onClose }: { viewId: string; onClose: (
       await loadPublishInfo();
       notify.success(t('publish.publishSuccessfully'));
       // eslint-disable-next-line
-    } catch (e: any) {
+    } catch(e: any) {
       notify.error(e.message);
     } finally {
       setPublishLoading(false);
     }
   }, [loadPublishInfo, publish, t, view, publishInfo, visibleViewId]);
 
-  const handleUnpublish = useCallback(async () => {
-    if (!view || !unpublish) return;
-    if (!isOwner && !isPublisher) {
+  const handleUnpublish = useCallback(async() => {
+    if(!view || !unpublish) return;
+    if(!isOwner && !isPublisher) {
       notify.error(t('settings.sites.error.unPublishPermissionDenied'));
       return;
     }
@@ -68,7 +79,7 @@ function PublishPanel ({ viewId, opened, onClose }: { viewId: string; onClose: (
       await loadPublishInfo();
       notify.success(t('publish.unpublishSuccessfully'));
       // eslint-disable-next-line
-    } catch (e: any) {
+    } catch(e: any) {
       notify.error(e.message);
     } finally {
       setUnpublishLoading(false);
@@ -76,12 +87,13 @@ function PublishPanel ({ viewId, opened, onClose }: { viewId: string; onClose: (
   }, [isOwner, isPublisher, loadPublishInfo, t, unpublish, view, viewId]);
 
   const renderPublished = useCallback(() => {
-    if (!publishInfo || !view) return null;
-    return <div className={'flex flex-col gap-4'}>
+    if(!publishInfo || !view) return null;
+    return <div className={'flex flex-col gap-5'}>
       <PublishLinkPreview
+        viewId={viewId}
         publishInfo={publishInfo}
         url={url}
-        onPublish={handlePublish}
+        updatePublishConfig={updatePublishConfig}
         onUnPublish={handleUnpublish}
         isOwner={isOwner}
         isPublisher={isPublisher}
@@ -107,15 +119,40 @@ function PublishPanel ({ viewId, opened, onClose }: { viewId: string; onClose: (
           variant={'contained'}
         >{t('shareAction.visitSite')}</Button>
       </div>
+      <div className={'flex flex-col'}>
+        <div className={'p-1.5 text-sm flex items-center gap-4 justify-between'}>
+          <span>{t('comments')}</span>
+          <Switch
+            checked={commentEnabled !== false}
+            onChange={e => {
+              setCommentEnabled(e.target.checked);
+              void updatePublishConfig({ comments_enabled: e.target.checked, view_id: viewId });
+            }}
+            size={'small'}
+          />
+        </div>
+        <div className={'p-1.5  text-sm flex items-center gap-4 justify-between'}>
+          <span>{t('duplicateAsTemplate')}</span>
+          <Switch
+            checked={duplicateEnabled !== false}
+            onChange={e => {
+              setDuplicateEnabled(e.target.checked);
+              void updatePublishConfig({ duplicate_enabled: e.target.checked, view_id: viewId });
+            }}
+            size={'small'}
+          />
+
+        </div>
+      </div>
     </div>;
-  }, [handlePublish, handleUnpublish, isOwner, isPublisher, onClose, publishInfo, t, unpublishLoading, url, view]);
+  }, [publishInfo, view, url, handleUnpublish, isOwner, isPublisher, onClose, unpublishLoading, t, commentEnabled, duplicateEnabled, updatePublishConfig, viewId]);
 
   const layout = view?.layout;
   const isDatabase = layout !== undefined ? [ViewLayout.Grid, ViewLayout.Board, ViewLayout.Calendar].includes(layout) : false;
   const hasPublished = view?.is_published;
 
   useEffect(() => {
-    if (!hasPublished && isDatabase && view) {
+    if(!hasPublished && isDatabase && view) {
       const childIds = [view.view_id, ...view.children.map((child) => child.view_id)];
 
       setVisibleViewId(childIds);
@@ -125,7 +162,7 @@ function PublishPanel ({ viewId, opened, onClose }: { viewId: string; onClose: (
   }, [hasPublished, isDatabase, view]);
 
   const renderUnpublished = useCallback(() => {
-    if (!view) return null;
+    if(!view) return null;
     const list = [view, ...view.children];
 
     return <div className={'flex flex-col gap-4 w-full'}>
@@ -148,7 +185,7 @@ function PublishPanel ({ viewId, opened, onClose }: { viewId: string; onClose: (
                   setVisibleViewId(prev => {
                     const checked = prev?.includes(id);
 
-                    if (checked) {
+                    if(checked) {
                       return prev?.filter((i) => i !== id);
                     } else {
                       return [...(prev || []), id];
@@ -212,7 +249,6 @@ function PublishPanel ({ viewId, opened, onClose }: { viewId: string; onClose: (
       >
         {view?.is_published ? renderPublished() : renderUnpublished()}
       </div>
-
     </div>
   );
 }

@@ -1,13 +1,17 @@
+import { UpdatePublishConfigPayload } from '@/application/types';
+import { notify } from '@/components/_shared/notify';
 import { useAppView, useUserWorkspaceInfo } from '@/components/app/app.hooks';
 import { useCurrentUser, useService } from '@/components/main/app.hooks';
 import React, { useCallback, useEffect, useMemo } from 'react';
 
-export function useLoadPublishInfo (viewId: string) {
+export function useLoadPublishInfo(viewId: string) {
   const view = useAppView(viewId);
   const [publishInfo, setPublishInfo] = React.useState<{
     namespace: string,
     publishName: string,
-    publisherEmail: string
+    publisherEmail: string,
+    commentEnabled: boolean,
+    duplicateEnabled: boolean,
   }>();
   const [loading, setLoading] = React.useState<boolean>(false);
   const service = useService();
@@ -15,10 +19,11 @@ export function useLoadPublishInfo (viewId: string) {
   const userWorkspaceInfo = useUserWorkspaceInfo();
   const currentUser = useCurrentUser();
   const isOwner = userWorkspaceInfo?.selectedWorkspace?.owner?.uid.toString() === currentUser?.uid.toString();
+  const workspaceId = userWorkspaceInfo?.selectedWorkspace?.id;
   const isPublisher = publishInfo?.publisherEmail === currentUser?.email;
 
-  const loadPublishInfo = useCallback(async () => {
-    if (!service) return;
+  const loadPublishInfo = useCallback(async() => {
+    if(!service) return;
     setLoading(true);
     try {
       const res = await service.getPublishInfo(viewId);
@@ -26,7 +31,7 @@ export function useLoadPublishInfo (viewId: string) {
       setPublishInfo(res);
 
       // eslint-disable-next-line
-    } catch (e: any) {
+    } catch(e: any) {
       // do nothing
     }
 
@@ -37,9 +42,30 @@ export function useLoadPublishInfo (viewId: string) {
     void loadPublishInfo();
   }, [loadPublishInfo]);
 
+  const updatePublishConfig = useCallback(async(payload: UpdatePublishConfigPayload) => {
+    if(!service || !workspaceId) return;
+    try {
+      await service.updatePublishConfig(workspaceId, payload);
+      setPublishInfo(prev => {
+        if(!prev) return prev;
+        return {
+          publishName: payload.publish_name || prev.publishName,
+          namespace: prev.namespace,
+          publisherEmail: prev.publisherEmail,
+          commentEnabled: payload.comments_enabled === undefined ? prev.commentEnabled : payload.comments_enabled,
+          duplicateEnabled: payload.duplicate_enabled === undefined ? prev.duplicateEnabled : payload.duplicate_enabled,
+        };
+      });
+      // eslint-disable-next-line
+    } catch(e: any) {
+      notify.error(e.message);
+    }
+
+  }, [service, workspaceId]);
+
   const url = useMemo(() => {
     return `${window.origin}/${publishInfo?.namespace}/${publishInfo?.publishName}`;
   }, [publishInfo]);
 
-  return { publishInfo, url, loadPublishInfo, view, loading, isPublisher, isOwner };
+  return { publishInfo, url, loadPublishInfo, view, loading, isPublisher, isOwner, updatePublishConfig };
 }
